@@ -57,11 +57,25 @@ def test_service_url_preserves_query_parameters():
 def test_redirect_url_with_url_as_get_parameter():
     factory = RequestFactory()
     request = factory.get('/login/', data={'next': '/landing-page/'})
-
-    actual = _redirect_url(request)
+    actual = _redirect_url(request, 'url_in_referer', 'next_arg')
     expected = '/landing-page/'
-
     assert actual == expected
+
+    login_route_str = '/accounts/login/'
+    login_next_arg = '/accounts/login/'
+    request = factory.get('/login/', data={'next': '/accounts/login/'})
+    actual = _redirect_url(request, login_route_str, login_next_arg)
+    expected = '/'
+    assert actual == expected
+
+
+    logout_route_str = '/accounts/logout/'
+    logout_next_arg = '/accounts/logout/'
+    request = factory.get('/login/', data={'next': '/accounts/logout/'})
+    actual = _redirect_url(request, logout_route_str, logout_next_arg)
+    expected = '/'
+    assert actual == expected
+
 
 
 def test_redirect_url_falls_back_to_cas_redirect_url_setting(settings):
@@ -71,7 +85,7 @@ def test_redirect_url_falls_back_to_cas_redirect_url_setting(settings):
     factory = RequestFactory()
     request = factory.get('/login/')
 
-    actual = _redirect_url(request)
+    actual = _redirect_url(request, 'url_in_referer', 'next_arg')
     expected = '/landing-page/'
 
     assert actual == expected
@@ -84,7 +98,7 @@ def test_params_redirect_url_preceeds_settings_redirect_url(settings):
     factory = RequestFactory()
     request = factory.get('/login/', data={'next': '/override/'})
 
-    actual = _redirect_url(request)
+    actual = _redirect_url(request, 'url_in_referer', 'next_arg')
     expected = '/override/'
 
     assert actual == expected
@@ -97,7 +111,8 @@ def test_redirect_url_falls_back_to_http_referrer(settings):
     factory = RequestFactory()
     request = factory.get('/login/', HTTP_REFERER='/landing-page/')
 
-    actual = _redirect_url(request)
+
+    actual = _redirect_url(request, 'url_in_referer', 'next_arg')
     expected = '/landing-page/'
 
     assert actual == expected
@@ -110,7 +125,7 @@ def test_redirect_url_strips_domain_prefix(settings):
     factory = RequestFactory()
     request = factory.get('/login/')
 
-    actual = _redirect_url(request)
+    actual = _redirect_url(request, 'url_in_referer', 'next_arg')
     expected = '/landing-page/'
 
     assert actual == expected

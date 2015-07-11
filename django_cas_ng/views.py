@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# encoding: utf-8
 """CAS login/logout replacement views"""
 
 from __future__ import absolute_import
@@ -42,17 +44,26 @@ def _service_url(request, redirect_to=None):
     return service
 
 
-def _redirect_url(request):
+def _redirect_url(request, referrer_uri, next_url_arg):
     """Redirects to referring page, or CAS_REDIRECT_URL if no referrer is
     set.
     """
+    # 处理 next 参数中含有登录或退出链接，会引起重定向循环的问题
+    if next_url_arg in request.GET.get(REDIRECT_FIELD_NAME, ''):
+        next_ = settings.CAS_REDIRECT_URL
+    else:
+        next_ = request.GET.get(REDIRECT_FIELD_NAME)
 
-    next_ = request.GET.get(REDIRECT_FIELD_NAME)
     if not next_:
         if settings.CAS_IGNORE_REFERER:
             next_ = settings.CAS_REDIRECT_URL
         else:
-            next_ = request.META.get('HTTP_REFERER', settings.CAS_REDIRECT_URL)
+            # 处理 http_referer 中含有登录或退出链接，会引起重定向循环的问题
+            http_referer = request.META.get('HTTP_REFERER', '')
+            if referrer_uri in http_referer:
+                next_ = settings.CAS_REDIRECT_URL
+            else:
+                next_ = request.META.get('HTTP_REFERER', settings.CAS_REDIRECT_URL)
         prefix = urllib_parse.urlunparse(
             (get_protocol(request), request.get_host(), '', '', '', ''),
         )
@@ -92,7 +103,9 @@ def login(request, next_page=None, required=False):
     """Forwards to CAS login URL or verifies CAS ticket"""
 
     if not next_page:
-        next_page = _redirect_url(request)
+        login_route_str = '/accounts/login/'
+        login_next_arg = '/accounts/login/'
+        next_page = _redirect_url(request, login_route_str, login_next_arg)
     if request.user.is_authenticated():
         message = "You are logged in as %s." % request.user.get_username()
         messages.success(request, message)
@@ -120,7 +133,9 @@ def logout(request, next_page=None):
     """Redirects to CAS logout page"""
     auth_logout(request)
     if not next_page:
-        next_page = _redirect_url(request)
+        logout_route_str = '/accounts/logout/'
+        logout_next_arg = '/accounts/logout/'
+        next_page = _redirect_url(request, logout_route_str, logout_next_arg)
     if settings.CAS_LOGOUT_COMPLETELY:
         return HttpResponseRedirect(_logout_url(request, next_page))
     else:
